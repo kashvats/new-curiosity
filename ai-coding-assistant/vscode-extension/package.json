@@ -1,0 +1,42 @@
+{
+  "name": "ai-project-auditor",
+  "publisher": "local-dev",
+  "displayName": "AI Project Auditor",
+  "description": "Brings the local AI Project Auditor dashboard directly into VSCode.",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/local/ai-project-auditor"
+  },
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiProjectAuditor.start",
+        "title": "AI Auditor: Open Dashboard"
+      },
+      {
+        "command": "aiProjectAuditor.history",
+        "title": "AI Auditor: View Audit History"
+      },
+      {
+        "command": "aiProjectAuditor.securityScan",
+        "title": "AI Auditor: Run Security Scan"
+      }
+    ]
+  },
+  "scripts": {
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0"
+  }
+}

@@ -1,0 +1,4 @@
+Query: FastAPI latest features
+Sources: https://fastapi.tiangolo.com/
+
+FastAPI has great Pydantic support.

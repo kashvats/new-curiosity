@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./data:/data
+      - ./backups:/workspace/backups
+      - ../../:/workspace/projects
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - BROWSER_SCREENSHOT_DIR=/data/screenshots
+      - BACKUP_DIR=/workspace/backups
+      - WORKSPACE_ROOT=/workspace/projects
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - qdrant
+
+  frontend:
+    image: ai-coding-assistant-frontend:latest
+    volumes:
+      - ./frontend/src:/app/src
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+
+volumes:
+  qdrant_data:

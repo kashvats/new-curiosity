@@ -1,0 +1,60 @@
+Chat Analysis: After parsing the 10,600+ line master specification (prompt.txt), it is clear we have completed foundational data ingestion (RAG, OCR, Search) up to Phase 46, but the majority of advanced agentic and architectural features (Phases 8-11, 48-61) remain entirely unbuilt.
+We have a massive backlog of unbuilt capabilities—especially around autonomous execution, multi-project management, and deep code analysis—that we can still build.
+
+[COMPLETED FEATURES]
+- Phase 12: Web search support (SearXNG)
+- Phase 18: Safe document ingestion queue
+- Phase 19: Batch PDF upload
+- Phase 20: Knowledge base collections
+- Phase 25: Reusable prompt library
+- Phase 27: Local model manager for Ollama models
+- Phase 28: Safe Ollama model pulling
+- Phase 29: Safe Ollama model deletion
+- Phase 30: Settings export/import
+- Phase 33: Project rules and guardrails
+- Phase 43: OCR detection and optional OCR for scanned PDFs
+- Phase 44: Chapter/section-aware chunking
+- Phase 46: Optional reranking for retrieval results
+
+[PARTIALLY BUILT / STUBS (Needs Work)]
+- Phase 13: Safe browser control (Playwright)
+- Phase 14: Clean and organize the frontend UI
+- Phase 17: Agent run history and audit logs
+- Phase 37: Safe test runner planner
+- Phase 38: Safe test runner
+- Phase 47: Codebase indexing into the knowledge base
+- Phase 53: Test Generation Agent
+
+[NOT COMPLETED / UNBUILT]
+- Phase 8: LangGraph planner
+- Phase 9: Coding agent (drafts changes)
+- Phase 11: Safe apply-changes support
+- Phase 15: Final polish, optimization, stability
+- Phase 16: Backup restore and project snapshot tools
+- Phase 21: Save approved web search summaries into KB
+- Phase 22: Manual notes as knowledge documents
+- Phase 23: RAG answer quality controls
+- Phase 24: Hybrid search support
+- Phase 26: Agents optionally use saved prompt templates
+- Phase 31: Optional local API key protection
+- Phase 32: Local usage analytics dashboard
+- Phase 34: Safe full workspace snapshot restore
+- Phase 35: Local project documentation generator
+- Phase 36: Local update/checklist system
+- Phase 39: Safe terminal command suggestions
+- Phase 40: Final system audit and consistency check
+- Phase 41: Full feature debug dashboard and issue report
+- Phase 42: Pause, resume, and retry for ingestion jobs
+- Phase 45: Parent-child retrieval for RAG
+- Phase 48: RAG evaluation tests
+- Phase 49: Conflict-safe patch application
+- Phase 50: Change timeline and restore points
+- Phase 51: Architecture Understanding Engine
+- Phase 52: Impact Analysis Engine
+- Phase 54: Coverage Analysis
+- Phase 55: Regression Detection
+- Phase 56: Performance Optimization Agent
+- Phase 57: Knowledge Gap Detection
+- Phase 58: Autonomous Project Auditor
+- Phase 59: Audit-to-Fix Workflow
+- Phase 61: Multi-Project Workspace Manager

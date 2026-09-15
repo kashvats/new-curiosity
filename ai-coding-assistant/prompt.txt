@@ -1,0 +1,72 @@
+rewrite the whole project
+act autonomously
+modify production code
+hallucinate missing logic
+guess business rules
+If unsure:
+state uncertainty.
+Deliverables
+Create:
+docs/REPO_SENTINEL_MIGRATION_PLAN.md
+The document must contain:
+Current Architecture
+Describe current project.
+Existing Modules
+List every major module.
+Purpose.
+Dependencies.
+Current quality.
+Reuse Table
+For every module:
+KEEP
+REFACTOR
+DEPRECATE
+REWRITE
+Reason.
+Technical Debt
+List problems.
+New Architecture
+Describe proposed architecture.
+Explain why.
+Folder Structure
+Show complete folder tree.
+Migration Strategy
+Step-by-step migration.
+Small safe steps.
+Risks
+List migration risks.
+Explain mitigation.
+Phase Breakdown
+Briefly describe:
+Phase 1
+Phase 2
+Phase 3
+...
+without implementing them.
+Documentation
+Update README only if absolutely necessary.
+Otherwise create migration docs only.
+Coding Restrictions
+Do NOT:
+implement scanner
+implement analyzer
+implement flow engine
+implement AI
+implement testing engine
+implement VS Code extension
+implement CLI
+Do NOT jump to Phase 1.
+Acceptance Criteria
+Phase 0 is complete only if:
+✓ Existing project fully inspected
+✓ Existing architecture understood
+✓ Reusable code identified
+✓ Deprecated code identified
+✓ Migration plan created
+✓ New architecture proposed
+✓ Folder structure proposed
+✓ Risks documented
+✓ No unnecessary rewrites performed
+✓ No major functionality implemented
+Stop after Phase 0.
+Do not continue until I explicitly approve Phase 1.

@@ -1,0 +1,177 @@
+[
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/agent_loop.py",
+    "line_number": 16,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/architecture.py",
+    "line_number": 77,
+    "issue_type": "n-plus-one-query-python",
+    "explanation": "Potential N+1 Query detected. Database query executed inside a loop."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/chunking.py",
+    "line_number": 67,
+    "issue_type": "n-plus-one-query-python",
+    "explanation": "Potential N+1 Query detected. Database query executed inside a loop."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/codebase_indexing.py",
+    "line_number": 86,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/codebase_indexing.py",
+    "line_number": 150,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/docs_updater.py",
+    "line_number": 90,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/docs_updater.py",
+    "line_number": 195,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/docs_updater.py",
+    "line_number": 202,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/extraction.py",
+    "line_number": 34,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/knowledge_bases.py",
+    "line_number": 60,
+    "issue_type": "n-plus-one-query-python",
+    "explanation": "Potential N+1 Query detected. Database query executed inside a loop."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/projects.py",
+    "line_number": 361,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/projects.py",
+    "line_number": 373,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/projects.py",
+    "line_number": 379,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/section_chunking.py",
+    "line_number": 78,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/section_chunking.py",
+    "line_number": 158,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/section_chunking.py",
+    "line_number": 217,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/section_chunking.py",
+    "line_number": 286,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/section_chunking.py",
+    "line_number": 333,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/settings_portability.py",
+    "line_number": 93,
+    "issue_type": "n-plus-one-query-python",
+    "explanation": "Potential N+1 Query detected. Database query executed inside a loop."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/settings_portability.py",
+    "line_number": 115,
+    "issue_type": "n-plus-one-query-python",
+    "explanation": "Potential N+1 Query detected. Database query executed inside a loop."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/settings_portability.py",
+    "line_number": 137,
+    "issue_type": "n-plus-one-query-python",
+    "explanation": "Potential N+1 Query detected. Database query executed inside a loop."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/backend/app/workspace_tools.py",
+    "line_number": 100,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "warning",
+    "file": "/src/frontend/fix_backticks.py",
+    "line_number": 7,
+    "issue_type": "nested-loops-python",
+    "explanation": "O(N^2) Complexity: Nested loops detected. Consider using a dictionary or set for lookups."
+  },
+  {
+    "severity": "info",
+    "issue_type": "Dynamic Load Test Results",
+    "explanation": "Load test on http://google.com completed. Avg latency: 361.41ms across 50 concurrent requests.",
+    "file": "N/A",
+    "line_number": 0
+  },
+  {
+    "severity": "warning",
+    "issue_type": "DB Connection Error",
+    "explanation": "Failed to connect to database for profiling: Psycopg cannot use the 'ProactorEventLoop' to run in async mode. Please use a compatible event loop, for instance by running 'asyncio.run(..., loop_factory=asyncio.SelectorEventLoop(selectors.SelectSelector()))'",
+    "file": "Database Schema",
+    "line_number": 0
+  }
+]
