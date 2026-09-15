@@ -5,8 +5,6 @@ import logging
 import os
 from typing import Dict, Any
 
-from app.embeddings import get_embedding
-from app.qdrant_store import search_vectors
 from app.model_manager import model_manager
 from app.config import settings
 
@@ -24,6 +22,8 @@ async def analyze_impact(target_file: str, proposed_change: str) -> Dict[str, An
     
     # 1. Search the codebase for references to this file (simulated dependency graph)
     try:
+        from app.embeddings import get_embedding
+        from app.qdrant_store import search_vectors
         query_vector = get_embedding(basename)
         code_collection = getattr(settings, "QDRANT_CODE_COLLECTION", "codebase")
         

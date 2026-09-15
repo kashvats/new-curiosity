@@ -161,40 +161,35 @@ class ApplyChangesRequest(BaseModel):
 def trigger_audit_fix_apply(req: ApplyChangesRequest):
     try:
         root = settings.WORKSPACE_ROOT
-        
-        # Unwrap nested dict if the frontend sends the whole object
+
+        # Unwrap nested dict if the frontend sends the whole coder result.
         changes_list = req.changes.get("proposed_changes", [])
         if isinstance(changes_list, dict):
             changes_list = changes_list.get("proposed_changes", [])
-            
+
+        # Normalize LLM paths to be relative to the selected project, then use the
+        # same snapshot + stale-write/path safety engine as Agent/Fix mode.
+        project_root = os.path.abspath(os.path.join(root, req.project_name))
+        workspace_abs = os.path.abspath(root)
+        if os.path.commonpath([workspace_abs, project_root]) != workspace_abs:
+            raise ValueError("Project path escapes workspace")
+        if not os.path.isdir(project_root):
+            raise ValueError(f"Project folder '{req.project_name}' not found")
+
+        normalized_changes = []
+        prefix = req.project_name.replace("\\", "/").rstrip("/") + "/"
         for change in changes_list:
             if not isinstance(change, dict):
                 continue
-                
-            action = change.get("action")
-            path = change.get("path")
-            content = change.get("content")
-            
-            if not path or not content:
-                continue
-            
-            full_path = os.path.join(root, path)
-            # Normalize: strip any leading project_name prefix the LLM may have added
-            # so files always land inside the project dir, not the workspace root
-            try:
-                rel = os.path.relpath(full_path, root)
-                # If the relative path starts with project_name, use project_path as base
-                parts = rel.replace("\\", "/").split("/")
-                if parts[0] == req.project_name:
-                    clean_rel = "/".join(parts[1:])
-                    full_path = os.path.join(root, req.project_name, clean_rel)
-            except ValueError:
-                pass  # relpath can fail on Windows with different drives — safe to ignore
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            if action in ["modify", "create"]:
-                with open(full_path, "w", encoding="utf-8") as f:
-                    f.write(content)
+            item = dict(change)
+            path = str(item.get("path", "")).replace("\\", "/")
+            if path.startswith(prefix):
+                path = path[len(prefix):]
+            item["path"] = path
+            normalized_changes.append(item)
+
+        from app.apply_changes import apply_drafted_changes
+        apply_results = apply_drafted_changes(normalized_changes, project_root, create_snapshot=True)
                     
         # History & Queue Updates
         import uuid
@@ -264,7 +259,7 @@ def trigger_audit_fix_apply(req: ApplyChangesRequest):
         except Exception as db_err:
             print(f"Warning: Failed to update audit history/queue: {db_err}")
                     
-        return {"status": "ok", "message": "Changes applied successfully"}
+        return {"status": "ok", "message": "Changes applied successfully", "apply_results": apply_results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

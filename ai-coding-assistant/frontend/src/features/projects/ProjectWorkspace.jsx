@@ -5,6 +5,7 @@ import ImpactAnalysisPanel from '../knowledge/ImpactAnalysisPanel';
 import ChangeTimelinePanel from '../maintenance/ChangeTimelinePanel';
 import AuditFixWorkflowPanel from '../maintenance/AuditFixWorkflowPanel';
 import VulnerabilityScannerPanel from '../security/VulnerabilityScannerPanel';
+import ImprovementCenterPanel from '../improvements/ImprovementCenterPanel';
 
 export default function ProjectWorkspace({ projectName, onBack }) {
   const [activeTab, setActiveTab] = useState('auditor');
@@ -14,7 +15,8 @@ export default function ProjectWorkspace({ projectName, onBack }) {
     { id: 'security', label: '🔒 Security Scan' },
     { id: 'architecture', label: '🏗️ Architecture Map' },
     { id: 'impact', label: '💥 Impact Analysis' },
-    { id: 'timeline', label: '⏱️ Timeline' }
+    { id: 'timeline', label: '⏱️ Timeline' },
+    { id: 'improvements', label: '🧠 Improvements' }
   ];
 
   return (
@@ -60,6 +62,7 @@ export default function ProjectWorkspace({ projectName, onBack }) {
         {activeTab === 'architecture' && <ArchitecturePanel injectedProjectName={projectName} />}
         {activeTab === 'impact' && <ImpactAnalysisPanel injectedProjectName={projectName} />}
         {activeTab === 'timeline' && <ChangeTimelinePanel injectedProjectName={projectName} />}
+        {activeTab === 'improvements' && <ImprovementCenterPanel projectName={projectName} />}
       </div>
     </div>
   );

@@ -32,10 +32,10 @@ export const apiClient = {
     });
     return handleResponse(res);
   },
-  postJson: async (path, body, method = 'POST') => {
+  postJson: async (path, body, method = 'POST', extraHeaders = {}) => {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: method,
-      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      headers: getHeaders({ 'Content-Type': 'application/json', ...extraHeaders }),
       body: JSON.stringify(body)
     });
     return handleResponse(res);
@@ -48,10 +48,10 @@ export const apiClient = {
     });
     return handleResponse(res);
   },
-  deleteJson: async (path) => {
+  deleteJson: async (path, extraHeaders = {}) => {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'DELETE',
-      headers: getHeaders()
+      headers: getHeaders(extraHeaders)
     });
     return handleResponse(res);
   }

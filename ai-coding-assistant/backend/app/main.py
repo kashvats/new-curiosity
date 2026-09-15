@@ -5,6 +5,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings, ensure_directories
 from app.database import init_database
@@ -41,6 +42,19 @@ async def lifespan(app: FastAPI):
     _background_tasks.add(job_task)
     job_task.add_done_callback(_background_tasks.discard)
     logger.info("Background job worker started")
+
+    # Part 8 dry-run improvement scheduler. Disabled by default and incapable of
+    # automatic source promotion; when enabled it launches observe-only cycles.
+    scheduler_task = None
+    if settings.IMPROVEMENT_DRY_RUN_SCHEDULER_ENABLED:
+        try:
+            from app.improvement_scheduler import scheduler_worker_loop
+            scheduler_task = asyncio.create_task(scheduler_worker_loop())
+            _background_tasks.add(scheduler_task)
+            scheduler_task.add_done_callback(_background_tasks.discard)
+            logger.info("Dry-run improvement scheduler started (observe/propose only)")
+        except Exception as e:
+            logger.warning(f"Could not start dry-run improvement scheduler: {e}")
     
     # Start background file watcher
     try:
@@ -91,6 +105,13 @@ async def lifespan(app: FastAPI):
         await job_task
     except asyncio.CancelledError:
         pass
+
+    if scheduler_task is not None:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
     
     try:
         from app.model_manager import model_manager
@@ -121,6 +142,19 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": settings.APP_NAME}
+
+
+@app.get("/health/live")
+async def health_live():
+    from app.improvement_scheduler_health import liveness_probe
+    return liveness_probe()
+
+
+@app.get("/health/ready")
+async def health_ready():
+    from app.improvement_scheduler_health import readiness_probe
+    result = readiness_probe()
+    return JSONResponse(status_code=200 if result.get("ready") else 503, content=result)
 
 @app.get("/qdrant/health")
 async def qdrant_health_check():
@@ -231,6 +265,73 @@ try:
     logger.info("Impact router registered")
 except ImportError as e:
     logger.warning(f"Could not import impact router: {e}")
+
+
+try:
+    from app.search import router as search_router
+    app.include_router(search_router)
+    logger.info("Document search router registered")
+except ImportError as e:
+    logger.warning(f"Could not import document search router: {e}")
+
+try:
+    from app.agents_api import router as agents_router
+    app.include_router(agents_router)
+    logger.info("Agents router registered")
+except ImportError as e:
+    logger.warning(f"Could not import agents router: {e}")
+
+try:
+    from app.ide_api import router as ide_router
+    app.include_router(ide_router)
+    logger.info("IDE router registered")
+except ImportError as e:
+    logger.warning(f"Could not import IDE router: {e}")
+
+try:
+    from app.improvement_api import router as improvement_router
+    app.include_router(improvement_router)
+    logger.info("Improvement controller router registered")
+except ImportError as e:
+    logger.warning(f"Could not import improvement controller router: {e}")
+
+try:
+    from app.improvement_scheduler_api import router as improvement_scheduler_router
+    app.include_router(improvement_scheduler_router)
+    logger.info("Dry-run improvement scheduler router registered")
+except ImportError as e:
+    logger.warning(f"Could not import dry-run improvement scheduler router: {e}")
+
+try:
+    from app.improvement_release_api import router as improvement_release_router
+    app.include_router(improvement_release_router)
+    logger.info("Candidate-to-staging release router registered")
+except ImportError as e:
+    logger.warning(f"Could not import candidate-to-staging release router: {e}")
+
+try:
+    from app.improvement_staging_api import router as improvement_staging_router
+    app.include_router(improvement_staging_router)
+    logger.info("Staging provider and release-handoff router registered")
+except ImportError as e:
+    logger.warning(f"Could not import staging provider router: {e}")
+
+try:
+    from app.improvement_production_governance_api import router as production_governance_router
+    app.include_router(production_governance_router)
+
+    from app.improvement_production_feedback_api import router as production_feedback_router
+    app.include_router(production_feedback_router)
+    logger.info("Production release governance router registered")
+except ImportError as e:
+    logger.warning(f"Could not import production governance router: {e}")
+
+try:
+    from app.improvement_certification_api import router as production_certification_router
+    app.include_router(production_certification_router)
+    logger.info("Production readiness certification router registered")
+except ImportError as e:
+    logger.warning(f"Could not import production certification router: {e}")
 
 
 if __name__ == "__main__":

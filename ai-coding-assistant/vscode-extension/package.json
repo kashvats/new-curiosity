@@ -1,27 +1,62 @@
 {
-  "name": "ai-project-auditor",
+  "name": "ai-coding-assistant",
   "publisher": "local-dev",
-  "displayName": "AI Project Auditor",
-  "description": "Brings the local AI Project Auditor dashboard directly into VSCode.",
-  "version": "1.0.0",
+  "displayName": "AI Coding Assistant",
+  "description": "Local agentic coding assistant with governed improvements, staging/production governance, an independent production deployer, production outcome learning, and Part 16 readiness certification.",
+  "version": "1.12.0",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
     "Machine Learning",
+    "Programming Languages",
     "Other"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/local/ai-project-auditor"
+    "url": "https://github.com/local/ai-coding-assistant"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
+        "command": "aiCodingAssistant.ask",
+        "title": "AI Coding Assistant: Ask"
+      },
+      {
+        "command": "aiCodingAssistant.plan",
+        "title": "AI Coding Assistant: Plan"
+      },
+      {
+        "command": "aiCodingAssistant.edit",
+        "title": "AI Coding Assistant: Edit"
+      },
+      {
+        "command": "aiCodingAssistant.fix",
+        "title": "AI Coding Assistant: Fix"
+      },
+      {
+        "command": "aiCodingAssistant.review",
+        "title": "AI Coding Assistant: Review"
+      },
+      {
+        "command": "aiCodingAssistant.agent",
+        "title": "AI Coding Assistant: Agent"
+      },
+      {
+        "command": "aiCodingAssistant.applyLast",
+        "title": "AI Coding Assistant: Apply Last Verified Repair"
+      },
+      {
+        "command": "aiCodingAssistant.showActivity",
+        "title": "AI Coding Assistant: Show Agent Activity"
+      },
+      {
         "command": "aiProjectAuditor.start",
-        "title": "AI Auditor: Open Dashboard"
+        "title": "AI Auditor: Run Audit"
       },
       {
         "command": "aiProjectAuditor.history",
@@ -30,8 +65,118 @@
       {
         "command": "aiProjectAuditor.securityScan",
         "title": "AI Auditor: Run Security Scan"
+      },
+      {
+        "command": "aiCodingAssistant.showLastDiff",
+        "title": "AI Coding Assistant: Show Last Verified Diff"
+      },
+      {
+        "command": "aiCodingAssistant.browseRepository",
+        "title": "AI Coding Assistant: Browse Repository"
+      },
+      {
+        "command": "aiCodingAssistant.searchCode",
+        "title": "AI Coding Assistant: Search Code"
+      },
+      {
+        "command": "aiCodingAssistant.searchSymbols",
+        "title": "AI Coding Assistant: Search Symbols"
+      },
+      {
+        "command": "aiCodingAssistant.improvementCenter",
+        "title": "AI Coding Assistant: Improvement Center"
+      },
+      {
+        "command": "aiCodingAssistant.improveProject",
+        "title": "AI Coding Assistant: Improve Project"
+      },
+      {
+        "command": "aiCodingAssistant.cancelImprovement",
+        "title": "AI Coding Assistant: Cancel Improvement Cycle"
+      },
+      {
+        "command": "aiCodingAssistant.autonomyReadiness",
+        "title": "AI Coding Assistant: Autonomy Readiness"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerStatus",
+        "title": "AI Coding Assistant: Dry-Run Scheduler Status"
+      },
+      {
+        "command": "aiCodingAssistant.runSchedulerTick",
+        "title": "AI Coding Assistant: Run Due Dry-Run Schedules"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerEmergencyStop",
+        "title": "AI Coding Assistant: Scheduler Emergency Stop"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerSimulate",
+        "title": "AI Coding Assistant: Simulate Dry-Run Schedule"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerMetrics",
+        "title": "AI Coding Assistant: Scheduler Metrics & Alerts"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerIntegrations",
+        "title": "AI Coding Assistant: Scheduler Integrations & HA"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerDrDrill",
+        "title": "AI Coding Assistant: Run Scheduler DR Drill"
+      },
+      {
+        "command": "aiCodingAssistant.schedulerDeploymentHealth",
+        "title": "AI Coding Assistant: Scheduler Deployment Health"
+      },
+      {
+        "command": "aiCodingAssistant.stagingReleaseCenter",
+        "title": "AI Coding Assistant: Staging Release Center"
+      },
+      {
+        "command": "aiCodingAssistant.stagingProviderCenter",
+        "title": "AI Coding Assistant: Staging Provider & Release Handoff"
+      },
+      {
+        "command": "aiCodingAssistant.productionGovernance",
+        "title": "AI Coding Assistant: Production Release Governance"
+      },
+      {
+        "command": "aiCodingAssistant.productionLearning",
+        "title": "AI Coding Assistant: Production Outcome Learning"
+      },
+      {
+        "command": "aiCodingAssistant.productionCertification",
+        "title": "AI Coding Assistant: Production Readiness Certification"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "aiCodingAssistant.ask",
+          "group": "ai@1"
+        },
+        {
+          "command": "aiCodingAssistant.fix",
+          "group": "ai@2"
+        },
+        {
+          "command": "aiCodingAssistant.review",
+          "group": "ai@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Coding Assistant",
+      "properties": {
+        "aiCodingAssistant.backendUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "FastAPI backend URL for the local AI Coding Assistant."
+        }
+      }
+    }
   },
   "scripts": {
     "package": "vsce package"

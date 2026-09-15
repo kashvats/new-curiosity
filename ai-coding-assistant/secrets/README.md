@@ -1,0 +1,14 @@
+# Runtime secrets
+
+When `IMPROVEMENT_SECRETS_PROVIDER=file` or `env_or_file`, create files here whose
+names exactly match the setting being resolved, for example:
+
+- `IMPROVEMENT_ALERT_WEBHOOK_SIGNING_SECRET`
+- `IMPROVEMENT_GITHUB_WEBHOOK_SECRET`
+- `IMPROVEMENT_GITLAB_WEBHOOK_TOKEN`
+- `IMPROVEMENT_GITHUB_STATUS_TOKEN`
+- `IMPROVEMENT_GITLAB_STATUS_TOKEN`
+- `IMPROVEMENT_SCHEDULER_REDIS_URL`
+- `IMPROVEMENT_SCHEDULER_POSTGRES_DSN`
+
+Do not commit real secret files.

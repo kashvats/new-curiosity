@@ -1,0 +1,4 @@
+# Optional Part 10 HA backend dependency.
+# The default SQLite coordinator requires nothing beyond requirements.txt.
+redis>=5.0,<6.0
+psycopg[binary]>=3.1,<4.0

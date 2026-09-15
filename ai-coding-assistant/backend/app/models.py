@@ -205,3 +205,9 @@ class RunHistoryResponse(BaseModel):
     created_at: str
     completed_at: Optional[str]
     error: Optional[str] = None
+
+# Agent/RAG evaluation models
+class EvalRunRequest(BaseModel):
+    limit: int = Field(default=5, ge=1, le=50)
+    score_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    knowledge_base_id: Optional[str] = None

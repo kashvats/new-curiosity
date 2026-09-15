@@ -160,3 +160,35 @@
 - [PUT] /{kb_id} (in knowledge_bases.py)
 - [PUT] /{rule_id} (in project_rules.py)
 - [PUT] /{template_id} (in prompt_library.py)
+
+## Agentic improvement routes added through Part 5
+
+- [GET] `/improvements/capabilities`
+- [GET] `/improvements/health`
+- [GET] `/improvements/health/latest`
+- [GET] `/improvements/health/{snapshot_id}`
+- [GET] `/improvements/dependencies`
+- [POST] `/improvements/baselines`
+- [GET] `/improvements/baselines`
+- [GET] `/improvements/drift`
+- [GET] `/improvements/learning/strategies`
+- [POST] `/improvements/cycles`
+- [GET] `/improvements/cycles`
+- [GET] `/improvements/cycles/{cycle_id}`
+- [POST] `/improvements/cycles/{cycle_id}/select`
+- [GET] `/improvements/cycles/{cycle_id}/experiments`
+- [GET] `/improvements/cycles/{cycle_id}/events`
+- [GET] `/improvements/cycles/{cycle_id}/events/stream`
+- [POST] `/improvements/cycles/{cycle_id}/apply`
+- [GET] `/improvements/outcomes`
+- [POST] `/agents/repairs/{issue_id}/rollback`
+
+## Governance and operator routes added in Part 6
+
+- [GET] `/improvements/policies/{project_name}`
+- [PUT] `/improvements/policies/{project_name}`
+- [GET] `/improvements/policies/{project_name}/history`
+- [GET] `/improvements/governance/checks`
+- [GET] `/improvements/test-impact`
+- [POST] `/improvements/cycles/{cycle_id}/cancel`
+- [POST] `/improvements/cycles/{cycle_id}/experiments/{experiment_id}/discard`

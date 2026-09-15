@@ -332,5 +332,19 @@ class ModelManager:
 model_manager = ModelManager()
 
 def get_effective_model(role: str) -> str:
-    """Helper to return the default model for a given role."""
-    return settings.DEFAULT_MODEL
+    """Return the configured model for an agent role.
+
+    This keeps role selection centralized so future hardware-aware routing can replace
+    the policy without rewriting every agent.
+    """
+    role = (role or "").lower().strip()
+    mapping = {
+        "planner": settings.PLANNER_MODEL,
+        "coder": settings.CODER_MODEL,
+        "debugger": settings.DEBUGGER_MODEL,
+        "reviewer": settings.REVIEWER_MODEL,
+        "tester": settings.FAST_MODEL,
+        "context": settings.FAST_MODEL,
+        "triage": settings.FAST_MODEL,
+    }
+    return mapping.get(role, settings.DEFAULT_MODEL)

@@ -1,0 +1,38 @@
+from __future__ import annotations
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+
+    PRODUCTION_DEPLOYER_DATABASE_PATH: str = "/data/production-deployer.db"
+    PRODUCTION_DEPLOYER_EXECUTION_ENABLED: bool = False
+    PRODUCTION_DEPLOYER_PACKAGE_SIGNING_KEY: str = ""
+    PRODUCTION_DEPLOYER_RECEIPT_SIGNING_KEY: str = ""
+    PRODUCTION_DEPLOYER_EXPECTED_AUDIENCE: str = "independent-production-deployer"
+    PRODUCTION_DEPLOYER_OPERATOR_CREDENTIALS_JSON: str = "{}"
+    PRODUCTION_DEPLOYER_ALLOWED_OPERATOR_ROLES: str = "release-manager,ops,deployer"
+    PRODUCTION_DEPLOYER_MIN_APPROVALS: int = 2
+    PRODUCTION_DEPLOYER_REQUIRED_APPROVAL_ROLES: str = "release-manager,ops"
+    PRODUCTION_DEPLOYER_ALLOWED_PROVIDERS: str = "kubernetes,ecs,external"
+    PRODUCTION_DEPLOYER_AUTO_ROLLBACK_ENABLED: bool = True
+    PRODUCTION_DEPLOYER_MIN_AVAILABILITY: float = 99.0
+    PRODUCTION_DEPLOYER_MAX_ERROR_RATE: float = 1.0
+    PRODUCTION_DEPLOYER_MAX_P95_MS: float = 2500.0
+    PRODUCTION_DEPLOYER_COMMAND_TIMEOUT_SECONDS: int = 900
+    PRODUCTION_DEPLOYER_OUTCOME_CALLBACK_URL: str = ""
+    PRODUCTION_DEPLOYER_CALLBACK_TIMEOUT_SECONDS: float = 5.0
+    PRODUCTION_DEPLOYER_ALLOW_HTTP_CALLBACK: bool = False
+    PRODUCTION_DEPLOYER_SECRETS_DIR: str = "/run/production-deployer-secrets"
+
+    # Part 16 hardening / certification
+    PRODUCTION_DEPLOYER_PREVIOUS_PACKAGE_SIGNING_KEYS: str = ""
+    PRODUCTION_DEPLOYER_PREVIOUS_RECEIPT_SIGNING_KEYS: str = ""
+    PRODUCTION_DEPLOYER_SLO_WINDOW_MIN_SAMPLES: int = 3
+    PRODUCTION_DEPLOYER_SLO_WINDOW_PASS_RATIO: float = 1.0
+    PRODUCTION_DEPLOYER_AUDIT_CHAIN_REQUIRED: bool = True
+    PRODUCTION_DEPLOYER_MAX_CONCURRENT_ACTIVE: int = 10
+    PRODUCTION_DEPLOYER_CERTIFICATION_MODE: bool = False
+
+
+settings = Settings()

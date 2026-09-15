@@ -3,6 +3,8 @@ import httpx
 import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from app.config import settings
 from app.model_manager import get_effective_model
 from app.project_rules import get_enabled_rules_text
@@ -203,3 +205,21 @@ async def generate_test_changes(task: str, file_paths: List[str], impact_report_
             "model": model_name,
             "message": str(e)
         }
+
+
+router = APIRouter(prefix="/tests/generate", tags=["test_generator"])
+
+class TestGenerationRequest(BaseModel):
+    task: str
+    file_paths: List[str] = Field(default_factory=list)
+    impact_report_id: Optional[str] = None
+    extra_context: Optional[str] = None
+
+@router.post("")
+async def generate_tests_endpoint(req: TestGenerationRequest):
+    result = await generate_test_changes(
+        req.task, list(req.file_paths), req.impact_report_id, req.extra_context
+    )
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result.get("message", "Test generation failed"))
+    return result

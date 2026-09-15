@@ -136,3 +136,9 @@ Create notification support for failures. Do not create standalone pages.
 Read the MASTER REFACTOR SPEC first. Migrate the following pages into backend automation: OCR, Ingestion Queue, Section Chunking, Codebase Index, RAG Evaluation, Knowledge Gaps, Regression, Backups, Restore Points.
 Replace them with: status cards, alerts, timeline entries, automation settings.
 After confirming replacement functionality exists, remove obsolete routes and navigation entries. Provide a final migration report.
+
+## Part 9 completed — production scheduler hardening
+
+The dry-run scheduler now includes signed/replay-protected evidence, CI identity binding, operator audit identity, environment-specific gates, monotonic fenced leases, simulation, persisted alerts, telemetry and Prometheus metrics. These controls harden observe/propose scheduling only; scheduled and automatic source apply remain disabled.
+
+Next: deployment adapters and operational resilience (external alert sinks, optional OpenTelemetry exporters, HA database/lease backends, Git provider provenance adapters, retention/disaster-recovery exercises). Do not enable unattended source promotion as an implicit follow-on.

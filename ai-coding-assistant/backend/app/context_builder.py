@@ -1,0 +1,125 @@
+"""Project-aware context assembly shared by IDE modes and agents.
+
+This module intentionally stays deterministic. It gathers only bounded local evidence;
+the LLM decides what it means later.
+"""
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+from typing import Any, Dict, Iterable
+
+from app.coder import collect_code_context
+from app.project_paths import resolve_project_root
+from app.safe_commands import run_safe_command
+from app.test_discovery import discover_project_checks
+
+
+def _local_python_neighbors(root: Path, rel_path: str) -> list[str]:
+    path = (root / rel_path).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return []
+    if path.suffix != ".py" or not path.is_file():
+        return []
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    module_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            module_names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            module_names.add(node.module)
+    candidates: set[str] = set()
+    for module in module_names:
+        module_path = Path(*module.split("."))
+        for candidate in (root / f"{module_path}.py", root / module_path / "__init__.py"):
+            if candidate.is_file():
+                candidates.add(candidate.relative_to(root).as_posix())
+    tests_dir = root / "tests"
+    if tests_dir.is_dir():
+        test_candidate = tests_dir / f"test_{path.stem}.py"
+        if test_candidate.is_file():
+            candidates.add(test_candidate.relative_to(root).as_posix())
+    return sorted(candidates)
+
+
+def _git_context(root: Path, current_file: str | None) -> Dict[str, Any]:
+    result: Dict[str, Any] = {}
+    try:
+        status = run_safe_command(root, ["git", "status", "--short"])
+        result["status"] = status.stdout[-12000:]
+    except Exception as exc:
+        result["status_error"] = str(exc)
+    try:
+        args = ["git", "diff", "--"]
+        if current_file:
+            args.append(current_file.replace("\\", "/"))
+        diff = run_safe_command(root, args)
+        result["diff"] = diff.stdout[-20000:]
+    except Exception as exc:
+        result["diff_error"] = str(exc)
+    return result
+
+
+def build_ide_context(
+    *,
+    project_name: str,
+    files: Iterable[str] = (),
+    current_file: str | None = None,
+    selected_text: str = "",
+    diagnostics: Iterable[Dict[str, Any]] = (),
+    terminal_output: str = "",
+    project_root: str | Path | None = None,
+) -> Dict[str, Any]:
+    root = Path(project_root).resolve() if project_root else resolve_project_root(project_name)
+    requested: list[str] = []
+    for value in [current_file, *list(files)]:
+        if value and value not in requested:
+            requested.append(str(value).replace("\\", "/"))
+
+    related: list[str] = []
+    for rel in requested[:4]:
+        related.extend(_local_python_neighbors(root, rel))
+    for rel in related:
+        if rel not in requested:
+            requested.append(rel)
+
+    context_files = collect_code_context(requested, project_name, str(root))
+    checks = discover_project_checks(root, requested)
+    return {
+        "project_name": project_name,
+        "project_root": str(root),
+        "files": context_files,
+        "requested_files": requested,
+        "current_file": current_file,
+        "selected_text": (selected_text or "")[:12000],
+        "diagnostics": list(diagnostics)[:100],
+        "terminal_output": (terminal_output or "")[-16000:],
+        "git": _git_context(root, current_file),
+        "test_discovery": checks,
+    }
+
+
+def render_context_for_llm(context: Dict[str, Any], *, max_chars: int = 50000) -> str:
+    parts: list[str] = []
+    for item in context.get("files", []):
+        parts.append(f"--- FILE {item.get('path')} sha256={item.get('sha256', '')} ---\n{item.get('content', '')}")
+    selected = context.get("selected_text")
+    if selected:
+        parts.append(f"--- SELECTED TEXT ---\n{selected}")
+    diagnostics = context.get("diagnostics") or []
+    if diagnostics:
+        parts.append(f"--- EDITOR DIAGNOSTICS ---\n{diagnostics}")
+    terminal = context.get("terminal_output")
+    if terminal:
+        parts.append(f"--- TERMINAL OUTPUT ---\n{terminal}")
+    git = context.get("git") or {}
+    if git.get("diff"):
+        parts.append(f"--- GIT DIFF ---\n{git['diff']}")
+    checks = context.get("test_discovery") or {}
+    parts.append(f"--- DISCOVERED CHECKS ---\n{checks}")
+    return "\n\n".join(parts)[:max_chars]
