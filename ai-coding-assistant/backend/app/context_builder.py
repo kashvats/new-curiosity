@@ -29,15 +29,29 @@ def _local_python_neighbors(root: Path, rel_path: str) -> list[str]:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except Exception:
         return []
-    module_names: set[str] = set()
+    module_names: set[tuple[int, str]] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            module_names.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            module_names.add(node.module)
+            module_names.update((0, alias.name) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            level = int(getattr(node, "level", 0) or 0)
+            if node.module:
+                module_names.add((level, node.module))
+            elif level:
+                module_names.update((level, alias.name) for alias in node.names)
     candidates: set[str] = set()
-    for module in module_names:
-        module_path = Path(*module.split("."))
+    for level, module in module_names:
+        module_parts = [part for part in module.split(".") if part]
+        if level:
+            package = list(path.parent.relative_to(root).parts)
+            ascend = max(0, level - 1)
+            if ascend > len(package):
+                continue
+            if ascend:
+                package = package[:-ascend]
+            module_path = Path(*(package + module_parts))
+        else:
+            module_path = Path(*module_parts)
         for candidate in (root / f"{module_path}.py", root / module_path / "__init__.py"):
             if candidate.is_file():
                 candidates.add(candidate.relative_to(root).as_posix())

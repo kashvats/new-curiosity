@@ -45,15 +45,9 @@ async def run_orchestrator(
     if not phases:
         return {"status": "error", "message": "Planner returned no phases", "plan": plan, "log": []}
 
-    # Keep planning artifacts inside the selected project, not at an unrelated workspace root.
-    try:
-        (project_root / "raw_prompt.md").write_text(f"# Original Request\n\n{idea}\n", encoding="utf-8")
-        lines = ["# Implementation Plan", "", f"Goal: {plan.get('goal', '')}", f"Summary: {plan.get('summary', '')}", ""]
-        for phase in phases:
-            lines.extend([f"## Phase {phase.get('id')}: {phase.get('title')}", str(phase.get("description", "")), ""])
-        (project_root / "plan.md").write_text("\n".join(lines), encoding="utf-8")
-    except OSError as exc:
-        logger.warning("Could not persist planning artifacts: %s", exc)
+    # Do not write planning artifacts into the live project before approval.  The
+    # plan is already returned to the caller/IDE and source writes remain confined
+    # to isolated candidate workspaces until an explicit apply action.
 
     log: List[Dict[str, Any]] = []
     for idx, phase in enumerate(phases):

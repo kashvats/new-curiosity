@@ -3,7 +3,7 @@
   "publisher": "local-dev",
   "displayName": "AI Coding Assistant",
   "description": "Local agentic coding assistant with v1.1 adaptive routing, repository intelligence, contextual mistake memory, governed releases, production outcome learning, and readiness certification.",
-  "version": "1.13.0",
+  "version": "1.13.1",
   "engines": {
     "vscode": "^1.80.0"
   },

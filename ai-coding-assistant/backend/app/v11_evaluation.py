@@ -14,6 +14,14 @@ from typing import Any, Dict, Iterable, List
 from app.database import get_db, init_database
 
 
+def _nonnegative_int(value: Any, field: str) -> int:
+    try:
+        parsed = int(value or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Benchmark field '{field}' must be an integer") from exc
+    return max(0, parsed)
+
+
 def repair_efficiency_summary(project_name: str | None = None, *, limit: int = 500) -> Dict[str, Any]:
     init_database()
     limit = max(1, min(int(limit), 5000))
@@ -73,10 +81,10 @@ def record_benchmark_run(*, version: str, suite_name: str, cases: Iterable[Dict[
             "case_id": str(case.get("case_id") or case.get("id") or len(normalized) + 1),
             "passed": bool(case.get("passed")),
             "regression": bool(case.get("regression", False)),
-            "llm_calls": max(0, int(case.get("llm_calls", 0) or 0)),
-            "tokens": max(0, int(case.get("tokens", 0) or 0)),
-            "duration_ms": max(0, int(case.get("duration_ms", 0) or 0)),
-            "files_changed": max(0, int(case.get("files_changed", 0) or 0)),
+            "llm_calls": _nonnegative_int(case.get("llm_calls", 0), "llm_calls"),
+            "tokens": _nonnegative_int(case.get("tokens", 0), "tokens"),
+            "duration_ms": _nonnegative_int(case.get("duration_ms", 0), "duration_ms"),
+            "files_changed": _nonnegative_int(case.get("files_changed", 0), "files_changed"),
         })
     run_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()

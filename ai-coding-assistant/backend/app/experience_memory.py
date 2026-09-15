@@ -65,29 +65,32 @@ def record_experience(
     files_list = sorted({str(x).replace("\\", "/") for x in files if str(x)})
     fp = _fingerprint(project_name, task, strategy, outcome, failure_class, files_list)
     now = _now()
+    exp_id = str(uuid.uuid4())
     with get_db() as conn:
-        row = conn.execute("SELECT id, occurrence_count FROM engineering_experiences WHERE fingerprint=?", (fp,)).fetchone()
-        if row:
-            count = int(row["occurrence_count"] or 1) + 1
-            conn.execute(
-                """UPDATE engineering_experiences SET occurrence_count=?, last_seen_at=?, lesson=?, metadata_json=? WHERE id=?""",
-                (count, now, (lesson or "")[:4000], json.dumps(metadata or {}, default=str), row["id"]),
-            )
-            exp_id = row["id"]
-        else:
-            exp_id = str(uuid.uuid4())
-            conn.execute(
-                """INSERT INTO engineering_experiences
-                   (id,project_name,issue_id,fingerprint,task,task_terms_json,strategy,outcome,failure_class,
-                    files_json,lesson,validation_status,metadata_json,occurrence_count,created_at,last_seen_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    exp_id, project_name, issue_id, fp, task[:8000], json.dumps(sorted(_terms(task))), strategy or "",
-                    outcome, failure_class, json.dumps(files_list), (lesson or "")[:4000], validation_status or "",
-                    json.dumps(metadata or {}, default=str), 1, now, now,
-                ),
-            )
+        # Atomic UPSERT: concurrent repair cycles can record the same contextual
+        # experience without racing a SELECT-then-INSERT sequence.
+        conn.execute(
+            """INSERT INTO engineering_experiences
+               (id,project_name,issue_id,fingerprint,task,task_terms_json,strategy,outcome,failure_class,
+                files_json,lesson,validation_status,metadata_json,occurrence_count,created_at,last_seen_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(fingerprint) DO UPDATE SET
+                 issue_id=excluded.issue_id,
+                 lesson=excluded.lesson,
+                 validation_status=excluded.validation_status,
+                 metadata_json=excluded.metadata_json,
+                 occurrence_count=engineering_experiences.occurrence_count + 1,
+                 last_seen_at=excluded.last_seen_at""",
+            (
+                exp_id, project_name, issue_id, fp, task[:8000], json.dumps(sorted(_terms(task))), strategy or "",
+                outcome, failure_class, json.dumps(files_list), (lesson or "")[:4000], validation_status or "",
+                json.dumps(metadata or {}, default=str), 1, now, now,
+            ),
+        )
+        row = conn.execute("SELECT id FROM engineering_experiences WHERE fingerprint=?", (fp,)).fetchone()
         conn.commit()
+        if row:
+            exp_id = str(row["id"])
     return {"id": exp_id, "fingerprint": fp}
 
 
@@ -137,10 +140,12 @@ def search_experiences(
             continue
         item["relevance_score"] = round(score, 4)
         scored.append((score, item))
-    scored.sort(key=lambda pair: (-pair[0], str(pair[1].get("last_seen_at") or "")), reverse=False)
-    # Re-sort explicitly because the tie expression above is intentionally stable but
-    # lexicographic direction is easier to read this way.
-    scored = sorted(scored, key=lambda pair: pair[0], reverse=True)
+    # Prefer stronger semantic/file relevance, then the most recently observed
+    # experience when scores tie. ISO-8601 UTC timestamps sort chronologically.
+    scored.sort(
+        key=lambda pair: (pair[0], str(pair[1].get("last_seen_at") or "")),
+        reverse=True,
+    )
     return [item for _, item in scored[: max(1, min(int(limit), 20))]]
 
 

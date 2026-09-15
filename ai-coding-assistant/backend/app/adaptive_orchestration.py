@@ -20,8 +20,9 @@ _DEBUG_TERMS = {
 }
 _SECURITY_TERMS = {
     "security", "vulnerability", "unsafe", "injection", "xss", "csrf", "auth",
-    "authorization", "permission", "credential", "secret", "token", "shell",
-    "sql", "path traversal", "ssrf", "rce",
+    "authentication", "authorization", "permission", "permissions", "credential",
+    "credentials", "secret", "secrets", "token", "tokens", "oauth", "jwt",
+    "session", "bypass", "shell", "sql", "path traversal", "ssrf", "rce",
 }
 _ARCH_TERMS = {
     "architecture", "migration", "schema", "distributed", "database", "refactor",
@@ -121,7 +122,7 @@ def route_task(
         complexity = "low"
 
     explicit_security_failure = security and bool(terms & {
-        "vulnerability", "unsafe", "injection", "xss", "csrf", "rce", "ssrf", "exploit"
+        "vulnerability", "unsafe", "injection", "xss", "csrf", "rce", "ssrf", "exploit", "bypass"
     })
     needs_initial_debugger = debug or explicit_security_failure
     # Planner is valuable for cross-cutting work. Security-sensitive feature work may

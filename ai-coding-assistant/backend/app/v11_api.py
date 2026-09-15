@@ -36,7 +36,7 @@ class ExperienceSearchRequest(BaseModel):
 
 
 class BenchmarkRunRequest(BaseModel):
-    version: str = "1.1.0"
+    version: str = "1.1.1"
     suite_name: str
     cases: List[Dict[str, Any]]
 
@@ -44,7 +44,7 @@ class BenchmarkRunRequest(BaseModel):
 @router.get("/capabilities")
 def capabilities():
     return {
-        "version": "1.1.0",
+        "version": "1.1.1",
         "adaptive_agent_routing": True,
         "repository_graph_context": True,
         "contextual_experience_memory": True,

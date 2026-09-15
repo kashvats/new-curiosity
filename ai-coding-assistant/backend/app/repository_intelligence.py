@@ -81,8 +81,13 @@ def _python_node(path: Path, root: Path) -> FileNode | None:
             symbols.append(node.name)
         elif isinstance(node, ast.Import):
             imports.extend(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imports.append(node.module)
+        elif isinstance(node, ast.ImportFrom):
+            prefix = "." * int(getattr(node, "level", 0) or 0)
+            if node.module:
+                imports.append(prefix + node.module)
+            elif prefix:
+                # `from . import sibling` / `from .. import sibling`
+                imports.extend(prefix + alias.name for alias in node.names)
         elif isinstance(node, ast.Call):
             fn = node.func
             if isinstance(fn, ast.Name):
@@ -116,6 +121,47 @@ def _module_aliases(rel_path: str) -> set[str]:
     return {a for a in aliases if a}
 
 
+def _import_candidates(source_path: str, raw_import: str) -> set[str]:
+    """Return normalized module/path candidates for Python/JS imports.
+
+    Python relative imports must be resolved against the source package.  Treating
+    `from .b import x` as plain `b` can connect to the wrong package when multiple
+    modules share the same basename.
+    """
+    raw = str(raw_import or "").strip()
+    if not raw:
+        return set()
+    candidates: set[str] = set()
+    if raw.startswith("."):
+        # JS/TS relative path (`./foo`, `../foo`) uses slash notation.
+        if raw.startswith("./") or raw.startswith("../"):
+            base_dir = Path(source_path).parent.as_posix()
+            normalized = posixpath.normpath(posixpath.join(base_dir, raw))
+            candidates.update({normalized, normalized.replace("/", ".")})
+            candidates.update({normalized + "/index", (normalized + "/index").replace("/", ".")})
+            return candidates
+
+        # Python relative import (`.b`, `..common`).  One leading dot means the
+        # current package, two means its parent, etc.
+        level = len(raw) - len(raw.lstrip("."))
+        module = raw[level:]
+        package_parts = list(Path(source_path).parent.parts)
+        ascend = max(0, level - 1)
+        if ascend:
+            if ascend > len(package_parts):
+                return set()
+            package_parts = package_parts[:-ascend]
+        target_parts = package_parts + ([p for p in module.split(".") if p] if module else [])
+        if target_parts:
+            normalized = "/".join(target_parts)
+            candidates.update({normalized, ".".join(target_parts)})
+        return candidates
+
+    clean = raw.lstrip(".")
+    candidates.update({clean, clean.replace("/", ".")})
+    return candidates
+
+
 def build_repository_graph(root: str | Path) -> Dict[str, Any]:
     base = Path(root).resolve()
     cache_key = str(base)
@@ -141,16 +187,7 @@ def build_repository_graph(root: str | Path) -> Dict[str, Any]:
             symbol_owner.setdefault(symbol.lower(), []).append(path)
         targets: set[str] = set()
         for imp in node.imports:
-            raw = str(imp).strip()
-            candidates: set[str] = set()
-            if raw.startswith("."):
-                base_dir = Path(path).parent.as_posix()
-                normalized = posixpath.normpath(posixpath.join(base_dir, raw))
-                candidates.update({normalized, normalized.replace("/", ".")})
-                candidates.update({normalized + "/index", (normalized + "/index").replace("/", ".")})
-            else:
-                clean = raw.lstrip(".")
-                candidates.update({clean, clean.replace("/", ".")})
+            candidates = _import_candidates(path, str(imp))
             for alias, target in alias_to_path.items():
                 if any(
                     candidate == alias

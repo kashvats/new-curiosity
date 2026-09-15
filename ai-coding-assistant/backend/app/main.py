@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
     # Start background file watcher
     try:
         from app.watcher import project_watcher
-        asyncio.get_running_loop().run_in_executor(None, project_watcher.start)
+        project_watcher.start(asyncio.get_running_loop())
     except Exception as e:
         logger.warning(f"Could not start project watcher: {e}")
     
@@ -124,7 +124,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description="Backend API for AI-powered coding assistant",
-    version="1.1.0",
+    version="1.1.1",
     lifespan=lifespan
 )
 
@@ -171,7 +171,7 @@ async def qdrant_health_check():
 async def root():
     return {
         "message": "AI Coding Assistant API",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "docs": "/docs"
     }
 

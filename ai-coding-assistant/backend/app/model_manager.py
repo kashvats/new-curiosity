@@ -10,14 +10,18 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-# Lazy semaphore — created on first use inside the running event loop.
+# Lazy semaphore — one per running event loop.  Reusing an asyncio.Semaphore
+# across separate loops (common in tests/reloads) can bind waiters to a closed loop.
 # Semaphore(1) = one Ollama inference at a time. Safe to raise to 2-3 on strong hardware.
 _ollama_semaphore: Optional[asyncio.Semaphore] = None
+_ollama_semaphore_loop: Optional[asyncio.AbstractEventLoop] = None
 
 def _get_semaphore() -> asyncio.Semaphore:
-    global _ollama_semaphore
-    if _ollama_semaphore is None:
+    global _ollama_semaphore, _ollama_semaphore_loop
+    loop = asyncio.get_running_loop()
+    if _ollama_semaphore is None or _ollama_semaphore_loop is not loop:
         _ollama_semaphore = asyncio.Semaphore(1)
+        _ollama_semaphore_loop = loop
     return _ollama_semaphore
 
 
@@ -174,45 +178,52 @@ class ModelManager:
         expect_json: bool = False,
         _is_fallback: bool = False
     ) -> str:
-        """Call local Ollama instance."""
+        """Call local Ollama instance without holding the GPU semaphore across fallback.
+
+        A 404 fallback used to recurse while the one-slot semaphore was still held,
+        deadlocking forever. Each HTTP attempt now releases the semaphore before a
+        fallback model is tried.
+        """
         ollama_url = getattr(settings, "OLLAMA_BASE_URL", getattr(settings, "ollama_base_url", "http://host.docker.internal:11434"))
         url = f"{ollama_url.rstrip('/')}/api/generate"
-        
-        full_prompt = prompt
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
-            
-        payload = {
-            "model": model,
-            "prompt": full_prompt,
-            "stream": False,
-            "keep_alive": -1,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens
+
+        current_model = model
+        fallback_attempt = _is_fallback
+        while True:
+            full_prompt = prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+            payload = {
+                "model": current_model,
+                "prompt": full_prompt,
+                "stream": False,
+                "keep_alive": -1,
+                "options": {"temperature": temperature, "num_predict": max_tokens},
             }
-        }
-        
-        if expect_json:
-            payload["format"] = "json"
-        
-        async with _get_semaphore():
+            if expect_json:
+                payload["format"] = "json"
+
             try:
-                response = await self._ollama_client.post(url, json=payload)
+                async with _get_semaphore():
+                    response = await self._ollama_client.post(url, json=payload)
                 response.raise_for_status()
                 return response.json().get("response", "")
             except httpx.TimeoutException:
                 raise Exception("LLM generation timed out (exceeded 10 minutes). The codebase might be too large, or the local model is still processing. Please try again.")
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404 and not _is_fallback:
+                if e.response.status_code == 404 and not fallback_attempt:
                     fallback = getattr(settings, "PLANNER_MODEL", settings.DEFAULT_MODEL)
-                    logger.warning(f"Model '{model}' not found in Ollama. Triggering background pull and falling back to '{fallback}'.")
-                    self._trigger_background_pull(model)
-                    return await self._call_ollama(prompt, fallback, temperature, max_tokens, system_prompt, expect_json, _is_fallback=True)
+                    if not fallback or fallback == current_model:
+                        raise Exception(f"LLM API Error: model '{current_model}' was not found and no distinct fallback is configured")
+                    logger.warning(f"Model '{current_model}' not found in Ollama. Triggering background pull and falling back to '{fallback}'.")
+                    self._trigger_background_pull(current_model)
+                    current_model = fallback
+                    fallback_attempt = True
+                    continue
                 raise Exception(f"LLM API Error: {e.response.text}")
             except Exception as e:
+                if isinstance(e, Exception) and str(e).startswith("LLM API Error:"):
+                    raise
                 raise Exception(f"Failed to connect to local LLM: {repr(e)}")
-            
+
     async def chat_with_tools(
         self,
         messages: List[Dict[str, Any]],
@@ -255,40 +266,45 @@ class ModelManager:
         temperature: float,
         _is_fallback: bool = False
     ) -> Dict[str, Any]:
-        """Call Ollama /api/chat endpoint with tools."""
+        """Call Ollama /api/chat without recursive semaphore deadlock on fallback."""
         ollama_url = getattr(settings, "OLLAMA_BASE_URL", getattr(settings, "ollama_base_url", "http://host.docker.internal:11434"))
         url = f"{ollama_url.rstrip('/')}/api/chat"
-        
-        payload = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "keep_alive": -1,
-            "options": {
-                "temperature": temperature
+        current_model = model
+        fallback_attempt = _is_fallback
+
+        while True:
+            payload = {
+                "model": current_model,
+                "messages": messages,
+                "stream": False,
+                "keep_alive": -1,
+                "options": {"temperature": temperature},
             }
-        }
-        
-        if tools:
-            payload["tools"] = tools
-            
-        async with _get_semaphore():
+            if tools:
+                payload["tools"] = tools
             try:
-                response = await self._ollama_client.post(url, json=payload)
+                async with _get_semaphore():
+                    response = await self._ollama_client.post(url, json=payload)
                 response.raise_for_status()
                 return response.json().get("message", {})
             except httpx.TimeoutException:
                 raise Exception("LLM chat timed out. Please try again.")
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404 and not _is_fallback:
+                if e.response.status_code == 404 and not fallback_attempt:
                     fallback = getattr(settings, "PLANNER_MODEL", settings.DEFAULT_MODEL)
-                    logger.warning(f"Model '{model}' not found in Ollama. Triggering background pull and falling back to '{fallback}'.")
-                    self._trigger_background_pull(model)
-                    return await self._chat_ollama_with_tools(messages, tools, fallback, temperature, _is_fallback=True)
+                    if not fallback or fallback == current_model:
+                        raise Exception(f"LLM Chat API Error: model '{current_model}' was not found and no distinct fallback is configured")
+                    logger.warning(f"Model '{current_model}' not found in Ollama. Triggering background pull and falling back to '{fallback}'.")
+                    self._trigger_background_pull(current_model)
+                    current_model = fallback
+                    fallback_attempt = True
+                    continue
                 raise Exception(f"LLM Chat API Error: {e.response.text}")
             except Exception as e:
+                if isinstance(e, Exception) and str(e).startswith("LLM Chat API Error:"):
+                    raise
                 raise Exception(f"Failed to connect to local LLM chat endpoint: {repr(e)}")
-            
+
     async def generate_completion_stream(
         self,
         prompt: str,
@@ -320,46 +336,54 @@ class ModelManager:
         system_prompt: Optional[str],
         _is_fallback: bool = False
     ):
+        """Stream Ollama output and release the semaphore before fallback retry."""
         ollama_url = getattr(settings, "OLLAMA_BASE_URL", "http://host.docker.internal:11434")
         url = f"{ollama_url.rstrip('/')}/api/generate"
-        
-        full_prompt = prompt
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
-            
-        payload = {
-            "model": model,
-            "prompt": full_prompt,
-            "stream": True,
-            "keep_alive": -1,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens
+        full_prompt = prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+        current_model = model
+        fallback_attempt = _is_fallback
+
+        while True:
+            payload = {
+                "model": current_model,
+                "prompt": full_prompt,
+                "stream": True,
+                "keep_alive": -1,
+                "options": {"temperature": temperature, "num_predict": max_tokens},
             }
-        }
-        
-        # Streaming acquires the semaphore for the entire stream to protect the GPU
-        async with _get_semaphore():
+            should_fallback = False
+            fallback_model = None
             try:
-                async with self._ollama_client.stream("POST", url, json=payload) as response:
-                    if response.status_code == 404 and not _is_fallback:
-                        fallback = getattr(settings, "PLANNER_MODEL", settings.DEFAULT_MODEL)
-                        logger.warning(f"Model '{model}' not found in Ollama. Triggering background pull and falling back to '{fallback}'.")
-                        self._trigger_background_pull(model)
-                        async for chunk in self._call_ollama_stream(prompt, fallback, temperature, max_tokens, system_prompt, _is_fallback=True):
-                            yield chunk
-                        return
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line:
-                            try:
-                                data = json.loads(line)
+                # Hold the GPU semaphore for one stream only.  If this attempt is a
+                # 404, exit the context first, then loop with the fallback model.
+                async with _get_semaphore():
+                    async with self._ollama_client.stream("POST", url, json=payload) as response:
+                        if response.status_code == 404 and not fallback_attempt:
+                            fallback_model = getattr(settings, "PLANNER_MODEL", settings.DEFAULT_MODEL)
+                            should_fallback = True
+                        else:
+                            response.raise_for_status()
+                            async for line in response.aiter_lines():
+                                if not line:
+                                    continue
+                                try:
+                                    data = json.loads(line)
+                                except json.JSONDecodeError:
+                                    continue
                                 if "response" in data:
                                     yield data["response"]
-                            except json.JSONDecodeError:
-                                pass
+                if should_fallback:
+                    if not fallback_model or fallback_model == current_model:
+                        raise Exception(f"LLM Stream API Error: model '{current_model}' was not found and no distinct fallback is configured")
+                    logger.warning(f"Model '{current_model}' not found in Ollama. Triggering background pull and falling back to '{fallback_model}'.")
+                    self._trigger_background_pull(current_model)
+                    current_model = fallback_model
+                    fallback_attempt = True
+                    continue
+                return
             except httpx.HTTPStatusError as e:
                 raise Exception(f"LLM Stream API Error: {e.response.text}")
+
 
 
 # Global instance

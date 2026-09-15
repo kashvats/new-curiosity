@@ -312,3 +312,7 @@ v1.1 improves the existing system rather than adding more autonomy:
 - all Part 16 verification, governance, staging and independent-production-deployer safety boundaries remain unchanged.
 
 See `backend/BUILD_V1_1_REPORT.md` and `generated_docs/V1_1_INTELLIGENCE_RUNBOOK.md`.
+
+### v1.1.1 bug-fix audit
+
+v1.1.1 is a second-pass reliability patch. It fixes Ollama fallback deadlocks, watchdog event-loop delivery/restartability, Python relative-import graph ambiguity, concurrent experience-memory writes, experience recency ordering, security routing for authentication bypasses, malformed benchmark validation, and an orchestrator bug that wrote planning files into the live repository before approval. See `BUGFIX_V1_1_1_REPORT.md`.

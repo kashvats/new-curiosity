@@ -75,4 +75,4 @@ Version 1.11.0 adds **Production Outcome Learning** visibility and extends Produ
 
 ## v1.1 Intelligence & Efficiency
 
-Extension v1.13.0 adds **AI Coding Assistant: Intelligence & Efficiency**. It shows adaptive-routing capability, historical repair-efficiency metrics, privacy-preserving model-usage estimates, and an optional route preview for the current task. Prompt/completion text is not stored by the v1.1 usage telemetry.
+Extension v1.13.1 adds **AI Coding Assistant: Intelligence & Efficiency**. It shows adaptive-routing capability, historical repair-efficiency metrics, privacy-preserving model-usage estimates, and an optional route preview for the current task. Prompt/completion text is not stored by the v1.1 usage telemetry.
