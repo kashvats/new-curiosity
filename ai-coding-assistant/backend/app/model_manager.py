@@ -1,8 +1,10 @@
 import logging
 import json
+import time
 from typing import Optional, Dict, Any, List
 import httpx
 from app.config import settings
+from app.model_usage import record_model_usage
 
 import asyncio
 
@@ -53,12 +55,28 @@ class ModelManager:
         if max_tokens is None:
             max_tokens = settings.DEFAULT_MAX_TOKENS
         
-        if "gpt" in model.lower():
-            return await self._call_openai(prompt, model, temperature, max_tokens, system_prompt, expect_json)
-        elif "claude" in model.lower():
-            return await self._call_anthropic(prompt, model, temperature, max_tokens, system_prompt, expect_json)
-        else:
-            return await self._call_ollama(prompt, model, temperature, max_tokens, system_prompt, expect_json)
+        provider = "openai" if "gpt" in model.lower() else ("anthropic" if "claude" in model.lower() else "ollama")
+        started = time.perf_counter()
+        prompt_chars = len(prompt or "") + len(system_prompt or "")
+        try:
+            if provider == "openai":
+                result = await self._call_openai(prompt, model, temperature, max_tokens, system_prompt, expect_json)
+            elif provider == "anthropic":
+                result = await self._call_anthropic(prompt, model, temperature, max_tokens, system_prompt, expect_json)
+            else:
+                result = await self._call_ollama(prompt, model, temperature, max_tokens, system_prompt, expect_json)
+            record_model_usage(
+                provider=provider, model=model, operation="completion", prompt_chars=prompt_chars,
+                output_chars=len(result or ""), duration_ms=int((time.perf_counter() - started) * 1000), success=True,
+            )
+            return result
+        except Exception as exc:
+            record_model_usage(
+                provider=provider, model=model, operation="completion", prompt_chars=prompt_chars,
+                output_chars=0, duration_ms=int((time.perf_counter() - started) * 1000), success=False,
+                error_type=type(exc).__name__,
+            )
+            raise
             
     def _trigger_background_pull(self, model: str):
         """Trigger a model pull in the background so future requests succeed."""
@@ -209,9 +227,25 @@ class ModelManager:
         if temperature is None:
             temperature = settings.DEFAULT_TEMPERATURE
             
-        # Currently defaults to Ollama's /api/chat. 
+        # Currently defaults to Ollama's /api/chat.
         # Add OpenAI/Anthropic branches here if needed later.
-        return await self._chat_ollama_with_tools(messages, tools, model, temperature)
+        started = time.perf_counter()
+        prompt_chars = len(json.dumps(messages, ensure_ascii=False, default=str))
+        try:
+            result = await self._chat_ollama_with_tools(messages, tools, model, temperature)
+            record_model_usage(
+                provider="ollama", model=model, operation="chat_with_tools", prompt_chars=prompt_chars,
+                output_chars=len(json.dumps(result, ensure_ascii=False, default=str)),
+                duration_ms=int((time.perf_counter() - started) * 1000), success=True,
+            )
+            return result
+        except Exception as exc:
+            record_model_usage(
+                provider="ollama", model=model, operation="chat_with_tools", prompt_chars=prompt_chars,
+                output_chars=0, duration_ms=int((time.perf_counter() - started) * 1000), success=False,
+                error_type=type(exc).__name__,
+            )
+            raise
 
     async def _chat_ollama_with_tools(
         self,

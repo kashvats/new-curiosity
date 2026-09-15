@@ -282,6 +282,21 @@ class Settings(BaseSettings):
     IMPROVEMENT_CERTIFICATION_MIN_PRODUCTION_SUCCESS_RATE: float = 0.80
     IMPROVEMENT_CERTIFICATION_MAX_ROLLBACK_RATE: float = 0.20
 
+    # v1.1 intelligence / efficiency improvements. These tune deterministic
+    # routing and local repository context selection; they do not weaken any
+    # reviewer, security, governance, staging, or production boundary.
+    V11_ADAPTIVE_ROUTING_ENABLED: bool = True
+    V11_REPOSITORY_CONTEXT_ENABLED: bool = True
+    V11_REPOSITORY_GRAPH_MAX_FILES: int = 1200
+    V11_REPOSITORY_GRAPH_MAX_BYTES: int = 8_000_000
+    V11_REPOSITORY_GRAPH_CACHE_SECONDS: float = 3.0
+    V11_REPOSITORY_CONTEXT_MAX_FILES: int = 8
+    V11_EXPERIENCE_MEMORY_ENABLED: bool = True
+    V11_EXPERIENCE_HISTORY_LIMIT: int = 300
+    V11_EXPERIENCE_PROMPT_LIMIT: int = 5
+
+    V11_MODEL_USAGE_TELEMETRY_ENABLED: bool = True
+
     # ------------------------------------------------------------------
     # Compatibility aliases for older modules. New code should use the
     # uppercase canonical names above.

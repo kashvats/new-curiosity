@@ -2,8 +2,8 @@
   "name": "ai-coding-assistant",
   "publisher": "local-dev",
   "displayName": "AI Coding Assistant",
-  "description": "Local agentic coding assistant with governed improvements, staging/production governance, an independent production deployer, production outcome learning, and Part 16 readiness certification.",
-  "version": "1.12.0",
+  "description": "Local agentic coding assistant with v1.1 adaptive routing, repository intelligence, contextual mistake memory, governed releases, production outcome learning, and readiness certification.",
+  "version": "1.13.0",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -149,6 +149,10 @@
       {
         "command": "aiCodingAssistant.productionCertification",
         "title": "AI Coding Assistant: Production Readiness Certification"
+      },
+      {
+        "command": "aiCodingAssistant.intelligenceEfficiency",
+        "title": "AI Coding Assistant: Intelligence & Efficiency"
       }
     ],
     "menus": {

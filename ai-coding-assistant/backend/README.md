@@ -980,3 +980,18 @@ GET  /improvements/production-governance/packages/{package_id}
 Part 14 deliberately has no production deploy/promote endpoint, cloud production adapter, production credential store, or production execution worker. The signed package is intended for a separately operated production deployer.
 
 See `BUILD_PART_14_REPORT.md` and `../generated_docs/PART14_PRODUCTION_GOVERNANCE_RUNBOOK.md`. Verified Part 14 boundary: **145 backend tests**.
+
+## v1.1 product improvement release
+
+Part 16 completed the major architecture roadmap. v1.1 is an optimization release, not Part 17.
+
+Key additions:
+
+- `app/adaptive_orchestration.py`: deterministic task classification and smallest-safe agent route;
+- `app/repository_intelligence.py`: bounded local symbol/import/reverse-import/call graph and relevance ranking;
+- `app/experience_memory.py`: contextual project-scoped mistake/success memory;
+- `app/model_usage.py`: privacy-preserving LLM duration/token-size telemetry;
+- `app/v11_evaluation.py`: repair-efficiency and benchmark comparison storage;
+- `app/v11_api.py`: inspection/evaluation endpoints under `/v1.1`.
+
+A simple first repair attempt can now skip the Debugger model call; any validation failure escalates to Debugger automatically. Reviewer, Security, Quality, approval, governance, staging, certification, and independent-production-deployer boundaries are unchanged.

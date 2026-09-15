@@ -51,6 +51,7 @@ function activate(context) {
     register(context, 'aiCodingAssistant.productionGovernance', showProductionGovernanceCenter);
     register(context, 'aiCodingAssistant.productionLearning', showProductionLearning);
     register(context, 'aiCodingAssistant.productionCertification', showProductionCertification);
+    register(context, 'aiCodingAssistant.intelligenceEfficiency', showIntelligenceEfficiency);
 
     // Existing project-auditor commands remain available and use the same backend.
     register(context, 'aiProjectAuditor.start', runAudit);
@@ -720,6 +721,31 @@ async function showStagingProviderCenter() {
 }
 
 
+
+
+async function showIntelligenceEfficiency() {
+    const workspace = getWorkspace();
+    if (!workspace) return;
+    try {
+        const [caps, efficiency, usage] = await Promise.all([
+            apiFetch('GET', '/v1.1/capabilities'),
+            apiFetch('GET', `/v1.1/evaluation/repair-efficiency?project_name=${encodeURIComponent(workspace.name)}&limit=500`),
+            apiFetch('GET', '/v1.1/evaluation/model-usage?limit=1000')
+        ]);
+        const task = await vscode.window.showInputBox({
+            prompt: 'Optional: preview the adaptive route for a coding task',
+            placeHolder: 'e.g. Fix authentication timeout regression'
+        });
+        let route = null;
+        if (task) {
+            const ctx = editorContext(workspace);
+            route = await apiFetch('POST', '/v1.1/routing/preview', { task, files: ctx.files || [], evidence: { diagnostics: ctx.diagnostics || [] } });
+        }
+        await openMarkdown(`Intelligence & Efficiency — ${workspace.name}`, `## v1.1 Intelligence & Efficiency\n\n**Adaptive routing:** ${caps.adaptive_agent_routing ? 'enabled' : 'disabled'}  \n**Repository graph context:** ${caps.repository_graph_context ? 'enabled' : 'disabled'}  \n**Contextual mistake memory:** ${caps.contextual_experience_memory ? 'enabled' : 'disabled'}  \n**Model-weight retraining:** ${caps.model_weight_retraining ? 'yes' : 'NO'}\n\n### Repair efficiency\n\n\`\`\`json\n${JSON.stringify(efficiency, null, 2)}\n\`\`\`\n\n### LLM usage telemetry\n\n\`\`\`json\n${JSON.stringify(usage, null, 2)}\n\`\`\`\n\n### Route preview\n\n${route ? `\`\`\`json\n${JSON.stringify(route, null, 2)}\n\`\`\`` : '_No task entered._'}\n\nUsage telemetry stores only sizes/durations and token estimates, not prompt or completion text.`);
+    } catch (err) {
+        vscode.window.showErrorMessage(`Could not load v1.1 intelligence metrics: ${err.message}`);
+    }
+}
 
 async function showProductionCertification() {
     const workspace = getWorkspace();

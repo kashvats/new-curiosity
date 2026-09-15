@@ -13,6 +13,8 @@ from app.coder import collect_code_context
 from app.project_paths import resolve_project_root
 from app.safe_commands import run_safe_command
 from app.test_discovery import discover_project_checks
+from app.config import settings
+from app.repository_intelligence import rank_relevant_files, compact_repository_context
 
 
 def _local_python_neighbors(root: Path, rel_path: str) -> list[str]:
@@ -74,6 +76,7 @@ def build_ide_context(
     diagnostics: Iterable[Dict[str, Any]] = (),
     terminal_output: str = "",
     project_root: str | Path | None = None,
+    task: str = "",
 ) -> Dict[str, Any]:
     root = Path(project_root).resolve() if project_root else resolve_project_root(project_name)
     requested: list[str] = []
@@ -88,6 +91,19 @@ def build_ide_context(
         if rel not in requested:
             requested.append(rel)
 
+    repository_context: Dict[str, Any] = {}
+    if getattr(settings, "V11_REPOSITORY_CONTEXT_ENABLED", True) and task:
+        try:
+            repository_context = rank_relevant_files(
+                root, task, seed_files=requested,
+                limit=min(int(getattr(settings, "V11_REPOSITORY_CONTEXT_MAX_FILES", 8)), int(settings.MAX_CODE_CONTEXT_FILES)),
+            )
+            for rel in repository_context.get("selected_paths", []):
+                if rel not in requested and len(requested) < int(settings.MAX_CODE_CONTEXT_FILES):
+                    requested.append(rel)
+        except Exception:
+            repository_context = {}
+
     context_files = collect_code_context(requested, project_name, str(root))
     checks = discover_project_checks(root, requested)
     return {
@@ -101,6 +117,7 @@ def build_ide_context(
         "terminal_output": (terminal_output or "")[-16000:],
         "git": _git_context(root, current_file),
         "test_discovery": checks,
+        "repository_intelligence": repository_context,
     }
 
 
@@ -120,6 +137,9 @@ def render_context_for_llm(context: Dict[str, Any], *, max_chars: int = 50000) -
     git = context.get("git") or {}
     if git.get("diff"):
         parts.append(f"--- GIT DIFF ---\n{git['diff']}")
+    repo = context.get("repository_intelligence") or {}
+    if repo:
+        parts.append(f"--- REPOSITORY RELEVANCE ---\n{compact_repository_context(repo)}")
     checks = context.get("test_discovery") or {}
     parts.append(f"--- DISCOVERED CHECKS ---\n{checks}")
     return "\n\n".join(parts)[:max_chars]

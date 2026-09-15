@@ -299,6 +299,53 @@ def init_database():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_repair_attempts_issue ON repair_attempts(issue_id, attempt_no)")
 
+        # v1.1 contextual engineering experience memory.  Records are project-scoped
+        # and auditable; this is operational learning, not model-weight retraining.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS engineering_experiences (
+                id TEXT PRIMARY KEY,
+                project_name TEXT NOT NULL,
+                issue_id TEXT,
+                fingerprint TEXT NOT NULL UNIQUE,
+                task TEXT NOT NULL,
+                task_terms_json TEXT NOT NULL DEFAULT '[]',
+                strategy TEXT,
+                outcome TEXT NOT NULL,
+                failure_class TEXT,
+                files_json TEXT NOT NULL DEFAULT '[]',
+                lesson TEXT,
+                validation_status TEXT,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                occurrence_count INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_engineering_experiences_project ON engineering_experiences(project_name,last_seen_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_engineering_experiences_issue ON engineering_experiences(issue_id)")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS v11_benchmark_runs (
+                id TEXT PRIMARY KEY,
+                version TEXT NOT NULL,
+                suite_name TEXT NOT NULL,
+                cases_json TEXT NOT NULL DEFAULT '[]',
+                summary_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_v11_benchmark_suite ON v11_benchmark_runs(suite_name,created_at)")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS v11_model_usage (
+                id TEXT PRIMARY KEY, provider TEXT NOT NULL, model TEXT NOT NULL, operation TEXT NOT NULL,
+                prompt_chars INTEGER NOT NULL DEFAULT 0, output_chars INTEGER NOT NULL DEFAULT 0,
+                estimated_input_tokens INTEGER NOT NULL DEFAULT 0, estimated_output_tokens INTEGER NOT NULL DEFAULT 0,
+                duration_ms INTEGER NOT NULL DEFAULT 0, success INTEGER NOT NULL DEFAULT 1, error_type TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_v11_model_usage_created ON v11_model_usage(created_at)")
+
         # Manual self-improvement controller state. Part 4 intentionally leaves
         # recurring scheduling disabled; cycles are user-triggered and auditable.
         cursor.execute("""

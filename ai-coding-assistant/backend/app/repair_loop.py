@@ -1,18 +1,26 @@
-"""Bounded detect -> diagnose -> code -> verify -> retry repair engine."""
+"""Bounded detect -> diagnose -> code -> verify -> retry repair engine.
+
+v1.1 adds deterministic adaptive routing, repository-aware context selection and
+contextual experience retrieval.  Verification/reviewer/security/quality gates are
+unchanged and remain mandatory for a verified candidate.
+"""
 from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
+from app.adaptive_orchestration import route_task
 from app.agent_runtime import AgentContext, agent_registry
 from app.candidate_workspace import CandidateWorkspace
 from app.config import settings
+from app.experience_memory import record_experience, search_experiences, format_experiences_for_prompt
 from app.model_manager import get_effective_model
 from app.patch_engine import apply_changes, preview_changes, PatchError
 from app.repair_attempt_store import store_repair_attempt, update_repair_attempt_result
+from app.repository_intelligence import rank_relevant_files
 from app.verification_service import verification_service
 from app.project_paths import resolve_project_root
 from app.quality_scorer import score_candidate
@@ -50,7 +58,6 @@ def _normalize_change_paths(changes: List[Dict[str, Any]], project_name: str) ->
 
 def _default_validation_plan(project_root: Path) -> List[Dict[str, Any]]:
     return discover_project_checks(project_root).get("quick_checks", [])
-
 
 
 def _materialize_candidate_changes(source_root: Path, candidate_root: Path) -> List[Dict[str, Any]]:
@@ -93,6 +100,7 @@ def _materialize_candidate_changes(source_root: Path, candidate_root: Path) -> L
             })
     return changes
 
+
 def _same_failure_seen(attempts: List[Dict[str, Any]], signature: str) -> bool:
     return bool(signature) and sum(1 for item in attempts if item.get("failure_signature") == signature) >= 2
 
@@ -107,6 +115,37 @@ def _emit(event_sink: Callable[[str, Dict[str, Any]], None] | None, event_type: 
         pass
 
 
+def _record_attempt_experience(
+    issue: RepairIssue,
+    *,
+    strategy: str,
+    outcome: str,
+    files: List[str],
+    validation: Dict[str, Any],
+    attempt_no: int,
+    diagnosis_source: str,
+    lesson: str = "",
+) -> None:
+    if not getattr(settings, "V11_EXPERIENCE_MEMORY_ENABLED", True):
+        return
+    try:
+        record_experience(
+            project_name=issue.project_name,
+            issue_id=issue.issue_id,
+            task=issue.task,
+            strategy=strategy,
+            outcome=outcome,
+            files=files,
+            failure_class=None if outcome == "succeeded" else str(validation.get("status") or "validation_failed"),
+            validation_status=str(validation.get("status") or outcome),
+            lesson=(lesson or str(validation.get("message") or validation.get("status") or outcome))[:1500],
+            metadata={"attempt_no": attempt_no, "diagnosis_source": diagnosis_source},
+        )
+    except Exception:
+        # Memory is advisory and must not affect repair correctness.
+        pass
+
+
 async def repair_issue(
     issue: RepairIssue,
     max_attempts: int | None = None,
@@ -115,37 +154,120 @@ async def repair_issue(
     source_root = _project_root(issue.project_name)
     max_attempts = min(int(max_attempts or settings.MAX_REPAIR_ATTEMPTS), int(settings.MAX_REPAIR_ATTEMPTS))
     attempts: List[Dict[str, Any]] = []
-    _emit(event_sink, "repair_started", {"issue_id": issue.issue_id, "project_name": issue.project_name, "task": issue.task})
+
+    route = route_task(issue.task, files=issue.files, evidence=issue.evidence)
+    working_files = list(issue.files)
+    repository_selection: Dict[str, Any] = {}
+    if getattr(settings, "V11_REPOSITORY_CONTEXT_ENABLED", True) and route.expand_repository_context:
+        try:
+            repository_selection = rank_relevant_files(
+                source_root,
+                issue.task,
+                seed_files=working_files,
+                limit=route.context_file_budget,
+            )
+            for rel in repository_selection.get("selected_paths", []):
+                if rel not in working_files and len(working_files) < route.context_file_budget:
+                    working_files.append(rel)
+        except Exception:
+            repository_selection = {}
+
+    prior_experiences: List[Dict[str, Any]] = []
+    if getattr(settings, "V11_EXPERIENCE_MEMORY_ENABLED", True):
+        try:
+            prior_experiences = search_experiences(
+                project_name=issue.project_name,
+                task=issue.task,
+                files=working_files,
+                limit=int(getattr(settings, "V11_EXPERIENCE_PROMPT_LIMIT", 5)),
+            )
+        except Exception:
+            prior_experiences = []
+
+    production_strategy_stats: Dict[str, Dict[str, Any]] = {}
+    try:
+        from app.improvement_production_feedback import production_learning_statistics
+        production_strategy_stats = {
+            str(item.get("strategy_key")): item
+            for item in production_learning_statistics(project_name=issue.project_name)
+            if item.get("strategy_key")
+        }
+    except Exception:
+        production_strategy_stats = {}
+
+    _emit(event_sink, "repair_started", {
+        "issue_id": issue.issue_id,
+        "project_name": issue.project_name,
+        "task": issue.task,
+        "adaptive_route": route.to_dict(),
+        "working_files": working_files,
+        "prior_experience_count": len(prior_experiences),
+    })
 
     with CandidateWorkspace.create(source_root) as candidate:
         _emit(event_sink, "candidate_workspace_ready", {"issue_id": issue.issue_id})
         for attempt_no in range(1, max_attempts + 1):
             _emit(event_sink, "attempt_started", {"attempt_no": attempt_no, "max_attempts": max_attempts})
             failure_evidence = attempts[-1].get("validation_result", {}) if attempts else issue.evidence
-            debug_result = await agent_registry.run("debugger", AgentContext(
-                task=issue.task,
-                project_name=issue.project_name,
-                project_root=str(candidate.root),
-                files=issue.files,
-                evidence=failure_evidence,
-                previous_attempts=attempts,
-            ))
-            diagnosis = debug_result.data.get("diagnosis", "")
-            strategy = debug_result.data.get("next_strategy", "")
-            _emit(event_sink, "diagnosis_ready", {"attempt_no": attempt_no, "diagnosis": diagnosis, "strategy": strategy})
+
+            # v1.1: direct first attempt for bounded non-debug work.  Any retry
+            # automatically escalates to the debugger, preserving diagnosis when it is
+            # actually useful instead of paying for it unconditionally.
+            use_debugger = (
+                attempt_no > 1
+                or route.needs_initial_debugger
+                or not getattr(settings, "V11_ADAPTIVE_ROUTING_ENABLED", True)
+            )
+            if use_debugger:
+                debug_result = await agent_registry.run("debugger", AgentContext(
+                    task=issue.task,
+                    project_name=issue.project_name,
+                    project_root=str(candidate.root),
+                    files=working_files,
+                    evidence=failure_evidence,
+                    previous_attempts=attempts,
+                ))
+                diagnosis = debug_result.data.get("diagnosis", "")
+                strategy = debug_result.data.get("next_strategy", "") or route.default_strategy
+                diagnosis_source = "debugger"
+            else:
+                diagnosis = (
+                    "Adaptive router selected a direct bounded coding attempt. "
+                    "Machine validation will escalate any failure to the debugger."
+                )
+                strategy = route.default_strategy
+                diagnosis_source = "adaptive_router"
+
+            _emit(event_sink, "diagnosis_ready", {
+                "attempt_no": attempt_no,
+                "diagnosis": diagnosis,
+                "strategy": strategy,
+                "source": diagnosis_source,
+                "debugger_invoked": use_debugger,
+            })
+
             history = json.dumps(attempts[-3:], default=str, ensure_ascii=False)
+            experience_context = format_experiences_for_prompt(prior_experiences)
+            production_context = ""
+            prod = production_strategy_stats.get(strategy)
+            if prod:
+                production_context = f"\n\nPRODUCTION HISTORY FOR THIS STRATEGY:\n{json.dumps(prod, ensure_ascii=False)}"
+
             extra_context = (
-                f"DEBUGGER DIAGNOSIS:\n{diagnosis}\nNEXT STRATEGY:\n{strategy}\n\n"
-                f"PREVIOUS ATTEMPTS (do not repeat ineffective fixes):\n{history}"
+                f"DIAGNOSIS SOURCE: {diagnosis_source}\n"
+                f"DIAGNOSIS:\n{diagnosis}\nNEXT STRATEGY:\n{strategy}\n\n"
+                f"PREVIOUS ATTEMPTS (do not repeat ineffective fixes):\n{history}\n\n"
+                f"{experience_context}{production_context}"
             )
 
             from app.coder import draft_code_changes
             coder = await draft_code_changes(
                 task=issue.task,
-                file_paths=issue.files,
+                file_paths=working_files,
                 extra_context=extra_context,
                 project_name=issue.project_name,
                 project_root=str(candidate.root),
+                expand_context=False,
             )
             _emit(event_sink, "candidate_drafted", {
                 "attempt_no": attempt_no,
@@ -169,7 +291,12 @@ async def repair_issue(
                     validation = verification_service.verify_with_regression(str(candidate.root), plan, regression_plan)
                     validation["diff_preview"] = preview
                     validation["discovered_checks"] = discovered
-                    _emit(event_sink, "validation_finished", {"attempt_no": attempt_no, "passed": validation.get("passed"), "status": validation.get("status"), "checks": validation.get("checks", [])})
+                    _emit(event_sink, "validation_finished", {
+                        "attempt_no": attempt_no,
+                        "passed": validation.get("passed"),
+                        "status": validation.get("status"),
+                        "checks": validation.get("checks", []),
+                    })
                 except (PatchError, ValueError) as exc:
                     validation = {"passed": False, "status": "patch_blocked", "message": str(exc)}
 
@@ -187,12 +314,25 @@ async def repair_issue(
                 "attempt_no": attempt_no,
                 "diagnosis": diagnosis,
                 "strategy": strategy,
+                "diagnosis_source": diagnosis_source,
+                "debugger_invoked": use_debugger,
                 "changes": changes,
                 "validation_plan": plan,
                 "validation_result": validation,
                 **persisted,
             }
             attempts.append(attempt_record)
+
+            if not validation.get("passed"):
+                _record_attempt_experience(
+                    issue,
+                    strategy=strategy,
+                    outcome="failed",
+                    files=[c.get("path", "") for c in changes] or working_files,
+                    validation=validation,
+                    attempt_no=attempt_no,
+                    diagnosis_source=diagnosis_source,
+                )
 
             if validation.get("passed"):
                 final_changes = _materialize_candidate_changes(source_root, candidate.root)
@@ -209,7 +349,10 @@ async def repair_issue(
                     evidence={"changes": final_changes, "validation": validation},
                 ))
                 quality = score_candidate(
-                    validation=validation, review=review.data, security=security.data, changes=final_changes
+                    validation=validation,
+                    review=review.data,
+                    security=security.data,
+                    changes=final_changes,
                 )
                 _emit(event_sink, "review_finished", {"attempt_no": attempt_no, **review.data})
                 _emit(event_sink, "security_finished", {"attempt_no": attempt_no, **security.data})
@@ -223,11 +366,31 @@ async def repair_issue(
                     attempt_record["validation_result"] = validation
                     attempt_record["quality_score"] = quality.get("score")
                     store_verified_repair(
-                        issue_id=issue.issue_id, project_name=issue.project_name, task=issue.task,
-                        proposed_changes=final_changes, validation=validation, review=review.data,
-                        security=security.data, quality=quality,
+                        issue_id=issue.issue_id,
+                        project_name=issue.project_name,
+                        task=issue.task,
+                        proposed_changes=final_changes,
+                        validation=validation,
+                        review=review.data,
+                        security=security.data,
+                        quality=quality,
                     )
-                    _emit(event_sink, "repair_verified", {"issue_id": issue.issue_id, "attempt_no": attempt_no, "quality": quality, "change_count": len(final_changes)})
+                    _record_attempt_experience(
+                        issue,
+                        strategy=strategy,
+                        outcome="succeeded",
+                        files=[c.get("path", "") for c in final_changes],
+                        validation={"status": "verified", "passed": True},
+                        attempt_no=attempt_no,
+                        diagnosis_source=diagnosis_source,
+                        lesson=str(coder.get("summary") or diagnosis or "Verified repair succeeded"),
+                    )
+                    _emit(event_sink, "repair_verified", {
+                        "issue_id": issue.issue_id,
+                        "attempt_no": attempt_no,
+                        "quality": quality,
+                        "change_count": len(final_changes),
+                    })
                     return {
                         "status": "verified",
                         "issue_id": issue.issue_id,
@@ -238,6 +401,10 @@ async def repair_issue(
                         "security": security.data,
                         "quality": quality,
                         "requires_approval": True,
+                        "adaptive_route": route.to_dict(),
+                        "working_files": working_files,
+                        "repository_selection": repository_selection,
+                        "prior_experiences": prior_experiences,
                         "note": "Candidate was isolated and cleaned after verification; proposed_changes contains the cumulative verified result.",
                     }
 
@@ -254,12 +421,39 @@ async def repair_issue(
                 attempt_record["validation_result"] = validation
                 attempt_record["quality_score"] = quality.get("score")
                 attempt_record["failure_signature"] = persisted.get("failure_signature", "")
+                _record_attempt_experience(
+                    issue,
+                    strategy=strategy,
+                    outcome="gate_failed",
+                    files=[c.get("path", "") for c in final_changes],
+                    validation=validation,
+                    attempt_no=attempt_no,
+                    diagnosis_source=diagnosis_source,
+                )
 
             signature = attempt_record.get("failure_signature") or persisted.get("failure_signature", "")
-            _emit(event_sink, "attempt_failed", {"attempt_no": attempt_no, "failure_signature": signature, "validation": attempt_record.get("validation_result", {})})
+            _emit(event_sink, "attempt_failed", {
+                "attempt_no": attempt_no,
+                "failure_signature": signature,
+                "validation": attempt_record.get("validation_result", {}),
+            })
             if _same_failure_seen(attempts, signature):
                 _emit(event_sink, "repair_stopped", {"issue_id": issue.issue_id, "reason": "repeated_failure"})
-                return {"status": "needs_human", "reason": "repeated_failure", "issue_id": issue.issue_id, "attempts": attempts}
+                return {
+                    "status": "needs_human",
+                    "reason": "repeated_failure",
+                    "issue_id": issue.issue_id,
+                    "attempts": attempts,
+                    "adaptive_route": route.to_dict(),
+                    "working_files": working_files,
+                }
 
         _emit(event_sink, "repair_stopped", {"issue_id": issue.issue_id, "reason": "max_retries_reached"})
-        return {"status": "needs_human", "reason": "max_retries_reached", "issue_id": issue.issue_id, "attempts": attempts}
+        return {
+            "status": "needs_human",
+            "reason": "max_retries_reached",
+            "issue_id": issue.issue_id,
+            "attempts": attempts,
+            "adaptive_route": route.to_dict(),
+            "working_files": working_files,
+        }

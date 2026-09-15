@@ -16,6 +16,7 @@ from app.config import settings
 from app.database import get_db
 from app.model_manager import model_manager, get_effective_model
 from app.patch_engine import validate_changes, PatchError
+from app.repository_intelligence import rank_relevant_files, compact_repository_context
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +138,24 @@ async def draft_code_changes(
     project_name: str = "default",
     session_id: str | None = None,
     project_root: str | None = None,
+    expand_context: bool = True,
 ) -> Dict[str, Any]:
     file_paths = list(file_paths or [])
     session_id = session_id or str(uuid.uuid4())
-    context_files = collect_code_context(file_paths, project_name, project_root)
+    repository_selection: Dict[str, Any] = {}
+    selected_paths = list(file_paths)
+    if project_root and expand_context and getattr(settings, "V11_REPOSITORY_CONTEXT_ENABLED", True):
+        try:
+            repository_selection = rank_relevant_files(
+                project_root, task, seed_files=file_paths,
+                limit=min(int(getattr(settings, "V11_REPOSITORY_CONTEXT_MAX_FILES", 8)), int(settings.MAX_CODE_CONTEXT_FILES)),
+            )
+            for rel in repository_selection.get("selected_paths", []):
+                if rel not in selected_paths and len(selected_paths) < int(settings.MAX_CODE_CONTEXT_FILES):
+                    selected_paths.append(rel)
+        except Exception:
+            repository_selection = {}
+    context_files = collect_code_context(selected_paths, project_name, project_root)
     caps = capability_summary()
 
     prompt_parts = [
@@ -155,6 +170,8 @@ async def draft_code_changes(
     ]
     if extra_context:
         prompt_parts.append(f"EXTRA CONTEXT:\n{extra_context}")
+    if repository_selection:
+        prompt_parts.append("REPOSITORY RELEVANCE:\n" + compact_repository_context(repository_selection))
     if context_files:
         rendered = []
         for item in context_files:
@@ -174,8 +191,12 @@ async def draft_code_changes(
         parsed["proposed_changes"] = validate_changes(proposed)
         parsed.setdefault("validation_plan", [])
         parsed.setdefault("warnings", [])
-        parsed.update({"status": "ok", "session_id": session_id, "model": get_effective_model("coder")})
-        _store_session(session_id, project_name, task, file_paths, parsed, "complete")
+        parsed.update({
+            "status": "ok", "session_id": session_id, "model": get_effective_model("coder"),
+            "context_files": selected_paths,
+            "repository_selection": repository_selection,
+        })
+        _store_session(session_id, project_name, task, selected_paths, parsed, "complete")
         return parsed
     except (ValueError, PatchError, Exception) as exc:
         logger.exception("Coder failed")

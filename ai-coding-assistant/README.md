@@ -184,7 +184,7 @@ uvicorn app.main:app --reload
 Current verified backend baseline:
 
 ```text
-145 passed
+169 passed
 0 backend module import failures
 ```
 
@@ -201,11 +201,9 @@ Current verified backend baseline:
 - kept scheduled and automatic source apply disabled,
 - achieved **78 passing backend tests**.
 
-## Next slice
+## Product-release mode
 
-Part 9 should harden production scheduler operation with signed/replay-protected evidence, commit binding, operator audit identity, telemetry/alerts, distributed leases, schedule simulation and environment-specific policies. Automatic live source promotion should remain disabled.
-
-See `backend/SELF_IMPROVING_ORGANISM_README.md` for the complete staged roadmap.
+The numbered architecture roadmap is complete through Part 16. New work now ships as product releases such as v1.1 rather than additional architecture parts. See `backend/BUILD_V1_1_REPORT.md` for the current intelligence/efficiency improvements.
 
 ### Part 9
 
@@ -296,3 +294,21 @@ See `backend/BUILD_PART_15_REPORT.md`, `generated_docs/PART15_PRODUCTION_DEPLOYE
 ## Part 16 — Production hardening and v1.0 readiness certification
 
 Part 16 adds a signed production-readiness certification plane and independent-deployer hardening. Certification requires fresh operator-recorded evidence across deployer tests, migration safety, key rotation, SLO windows, rollback drills, chaos/failover, security attack testing, audit-chain verification, and load/concurrency checks. The AI backend still cannot execute production deployments.
+
+## v1.1 — Intelligence, Performance & Contextual Learning
+
+After Part 16 completed the major v1.0 architecture, development switched from numbered architecture phases to product releases.
+
+v1.1 improves the existing system rather than adding more autonomy:
+
+- adaptive agent routing avoids unnecessary initial Debugger and Planner LLM calls for bounded tasks,
+- failures automatically escalate to the Debugger on retry,
+- a deterministic repository symbol/import/call graph ranks relevant source and test files,
+- Coder and IDE Context Agent receive repository-ranked context without another model call,
+- contextual engineering experience memory retrieves similar past successes/failures by task and files,
+- Part 15 production outcome learning remains active and can be injected for matching strategies,
+- privacy-preserving model-usage telemetry measures duration and token-size estimates without storing prompts,
+- benchmark-run persistence enables release-to-release comparison using success, regression, LLM-call, token, latency and changed-file metrics,
+- all Part 16 verification, governance, staging and independent-production-deployer safety boundaries remain unchanged.
+
+See `backend/BUILD_V1_1_REPORT.md` and `generated_docs/V1_1_INTELLIGENCE_RUNBOOK.md`.

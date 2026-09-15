@@ -124,7 +124,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description="Backend API for AI-powered coding assistant",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -171,7 +171,7 @@ async def qdrant_health_check():
 async def root():
     return {
         "message": "AI Coding Assistant API",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "docs": "/docs"
     }
 
@@ -280,6 +280,13 @@ try:
     logger.info("Agents router registered")
 except ImportError as e:
     logger.warning(f"Could not import agents router: {e}")
+
+try:
+    from app.v11_api import router as v11_router
+    app.include_router(v11_router)
+    logger.info("v1.1 intelligence router registered")
+except ImportError as e:
+    logger.warning(f"Could not import v1.1 intelligence router: {e}")
 
 try:
     from app.ide_api import router as ide_router

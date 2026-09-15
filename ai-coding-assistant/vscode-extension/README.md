@@ -71,3 +71,8 @@ The command does not possess production credentials and has no production deploy
 ## Part 15
 
 Version 1.11.0 adds **Production Outcome Learning** visibility and extends Production Release Governance with immutable artifact binding plus issuance of short-lived deployment authorizations for the separate production-deployer service. The extension still has no direct production-deploy command.
+
+
+## v1.1 Intelligence & Efficiency
+
+Extension v1.13.0 adds **AI Coding Assistant: Intelligence & Efficiency**. It shows adaptive-routing capability, historical repair-efficiency metrics, privacy-preserving model-usage estimates, and an optional route preview for the current task. Prompt/completion text is not stored by the v1.1 usage telemetry.

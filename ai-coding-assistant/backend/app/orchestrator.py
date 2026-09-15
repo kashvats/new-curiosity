@@ -10,6 +10,7 @@ from app.config import settings
 from app.planner import create_plan
 from app.project_paths import resolve_project_root
 from app.repair_loop import RepairIssue, repair_issue
+from app.adaptive_orchestration import route_task, deterministic_single_phase_plan
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,13 @@ async def run_orchestrator(
     except ValueError as exc:
         return {"status": "error", "message": str(exc), "log": []}
 
-    plan = await create_plan(idea)
+    route = route_task(idea, files=context_files)
+    if getattr(settings, "V11_ADAPTIVE_ROUTING_ENABLED", True) and not route.needs_planner:
+        plan = deterministic_single_phase_plan(idea, route)
+    else:
+        plan = await create_plan(idea)
+        plan.setdefault("adaptive_route", route.to_dict())
+        plan.setdefault("planner_skipped", False)
     phases = plan.get("phases", [])
     if not phases:
         return {"status": "error", "message": "Planner returned no phases", "plan": plan, "log": []}
@@ -86,4 +93,5 @@ async def run_orchestrator(
         "plan": plan,
         "log": log,
         "auto_apply": auto_apply,
+        "adaptive_route": route.to_dict(),
     }

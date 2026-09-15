@@ -72,6 +72,7 @@ class ContextAgent:
             selected_text=context.evidence.get("selected_text", ""),
             diagnostics=context.evidence.get("diagnostics", []),
             terminal_output=context.evidence.get("terminal_output", ""),
+            task=context.task,
         )
         return AgentResult(self.name, "ok", data)
 
